@@ -1,0 +1,15 @@
+venv/
+__pycache__/
+
+cache/
+
+backend/outputs/
+
+data/dataset/candidates.jsonl
+
+*.npy
+*.pkl
+*.index
+*.zip
+
+output.txt

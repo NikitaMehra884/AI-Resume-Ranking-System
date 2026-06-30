@@ -1,0 +1,7 @@
+numpy
+faiss-cpu
+sentence-transformers
+torch
+scikit-learn
+rank_bm25
+python-docx
