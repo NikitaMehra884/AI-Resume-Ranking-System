@@ -1,3 +1,4 @@
+import os
 import pickle
 from pathlib import Path
 
@@ -20,10 +21,35 @@ class SemanticService:
 
         self.project_root = Path(__file__).resolve().parents[2]
 
-        self.cache_dir = (
-            self.project_root
-            / "cache"
-        )
+        self.project_cache_dir = self.project_root / "cache"
+        self.project_cache_dir.mkdir(parents=True, exist_ok=True)
+
+        hf_home = Path(os.environ.get("HF_HOME") or (Path.home() / ".cache" / "huggingface"))
+        self.cache_dir = hf_home
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.model_cache_dir = self.cache_dir / "hub"
+        self.model_cache_dir.mkdir(parents=True, exist_ok=True)
+
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
+        os.environ.setdefault("HF_HOME", str(self.cache_dir))
+        os.environ.setdefault("TRANSFORMERS_CACHE", str(self.cache_dir / "transformers"))
+
+    def _load_model(self):
+        if SemanticService._model is None:
+            print("\nLoading Semantic Model (CPU, local cache only)...")
+            model_kwargs = {
+                "device": "cpu",
+                "local_files_only": True,
+                "cache_folder": str(self.model_cache_dir),
+            }
+
+            SemanticService._model = SentenceTransformer(
+                "all-MiniLM-L6-v2",
+                **model_kwargs,
+            )
+            SemanticService._model.max_seq_length = 256
+
+        return SemanticService._model
 
     # ==========================================
     # Single Embedding
@@ -34,15 +60,11 @@ class SemanticService:
         if not text:
             text = ""
 
-        # lazy model init (CPU only) using class-level singleton
-        if SemanticService._model is None:
-            print("\nLoading Semantic Model (CPU)...")
-            SemanticService._model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
-            SemanticService._model.max_seq_length = 256
+        model = self._load_model()
 
         with torch.inference_mode():
 
-            return SemanticService._model.encode(
+            return model.encode(
 
                 text,
 
@@ -63,15 +85,11 @@ class SemanticService:
         if not texts:
             return []
 
-        # lazy model init (CPU only) using class-level singleton
-        if SemanticService._model is None:
-            print("\nLoading Semantic Model (CPU)...")
-            SemanticService._model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
-            SemanticService._model.max_seq_length = 256
+        model = self._load_model()
 
         with torch.inference_mode():
 
-            return SemanticService._model.encode(
+            return model.encode(
 
                 texts,
 
@@ -114,7 +132,7 @@ class SemanticService:
 
             SemanticService._candidate_embeddings = np.load(
 
-                self.cache_dir
+                self.project_cache_dir
                 / "candidate_embeddings.npy"
 
             )
@@ -137,7 +155,7 @@ class SemanticService:
 
             with open(
 
-                self.cache_dir
+                self.project_cache_dir
                 / "candidate_ids.pkl",
 
                 "rb"
@@ -162,7 +180,7 @@ class SemanticService:
 
             with open(
 
-                self.cache_dir
+                self.project_cache_dir
                 / "candidate_documents.pkl",
 
                 "rb"

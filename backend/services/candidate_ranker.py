@@ -53,14 +53,16 @@ class CandidateRanker:
         job_skills=None,
         semantic_service=None,
         candidate_index=None,
+        career_relevance_score=None,
+        candidate_skills=None,
     ):
 
         # ==========================================
         # Skill Score
         # ==========================================
 
-        # Candidate skills (derived from candidate document)
-        candidate_skills = self.skill_service.extract_skills(candidate_document)
+        if candidate_skills is None:
+            candidate_skills = self.skill_service.extract_skills(candidate_document)
 
         # Job skills can be passed in (cached) to avoid repeated extraction
         if job_skills is None:
@@ -98,12 +100,15 @@ class CandidateRanker:
         # Career Relevance
         # ==========================================
 
-        career_score = (
-            self.career_relevance_service.calculate_score(
-                candidate.career_history,
-                job_embedding
+        if career_relevance_score is None:
+            career_score = (
+                self.career_relevance_service.calculate_score(
+                    candidate.career_history,
+                    job_embedding
+                )
             )
-        )
+        else:
+            career_score = career_relevance_score
 
         # ==========================================
         # Redrob Score

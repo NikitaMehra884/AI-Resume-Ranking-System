@@ -1,3 +1,5 @@
+import numpy as np
+
 from backend.services.semantic_service import SemanticService
 
 
@@ -38,25 +40,39 @@ class CareerRelevanceService:
         if not descriptions:
             return 0.0
 
-        # Encode all descriptions together (faster)
-        description_embeddings = (
-            self.semantic_service.batch_embedding(
-                descriptions
-            )
+        return self.calculate_score_from_embeddings(
+            descriptions,
+            job_embedding,
+            None
         )
+
+    def calculate_score_from_embeddings(
+        self,
+        descriptions,
+        job_embedding,
+        description_embeddings=None
+    ):
+
+        if not descriptions:
+            return 0.0
+
+        if description_embeddings is None:
+            description_embeddings = (
+                self.semantic_service.batch_embedding(
+                    descriptions
+                )
+            )
 
         similarities = []
 
         for embedding in description_embeddings:
 
-            score = self.semantic_service.similarity(
-                embedding,
-                job_embedding
+            score = round(
+                float(np.dot(embedding, job_embedding)),
+                4
             )
-
             similarities.append(score)
 
-        # Recent experience gets more weight
         weights = [0.5, 0.3, 0.2]
 
         final_score = 0.0

@@ -99,14 +99,65 @@ class RankingPipeline:
         # map id -> candidate object
         id_to_candidate = {c.candidate_id: c for c in candidates}
 
+        candidate_documents = {
+            candidate.candidate_id: self.document_builder.build_candidate_document(candidate)
+            for candidate in candidates
+        }
+
         # cache job skills once
         job_skills = self.candidate_ranker.skill_service.extract_skills(
             job.description
         )
 
+        # precompute career relevance scores in a single batched pass
+        career_relevance_cache = {}
+        descriptions_to_encode = []
+        candidate_description_map = []
+
+        for candidate in candidates:
+            descriptions = []
+            for history_item in candidate.career_history:
+                description = history_item.get("description", "").strip()
+                if description:
+                    descriptions.append(description)
+
+            candidate_description_map.append((candidate.candidate_id, descriptions))
+
+            if descriptions:
+                descriptions_to_encode.extend(descriptions)
+
+        if descriptions_to_encode:
+            description_embeddings = self.semantic_service.batch_embedding(
+                descriptions_to_encode
+            )
+            offset = 0
+            for candidate_id, descriptions in candidate_description_map:
+                if not descriptions:
+                    career_relevance_cache[candidate_id] = 0.0
+                    continue
+
+                chunk_size = len(descriptions)
+                chunk_embeddings = description_embeddings[
+                    offset:offset + chunk_size
+                ]
+                offset += chunk_size
+                career_relevance_cache[candidate_id] = (
+                    self.candidate_ranker.career_relevance_service.calculate_score_from_embeddings(
+                        descriptions,
+                        job_embedding,
+                        chunk_embeddings
+                    )
+                )
+        else:
+            for candidate in candidates:
+                career_relevance_cache[candidate.candidate_id] = 0.0
+
         print("\nRanking Shortlisted Candidates...\n")
 
         ranking_start = time.perf_counter()
+
+        candidate_ranker = self.candidate_ranker
+        semantic_service = self.semantic_service
 
         for r in faiss_results:
 
@@ -120,22 +171,25 @@ class RankingPipeline:
 
             processed += 1
 
-            # build document and fetch cached candidate embedding
-            document = self.document_builder.build_candidate_document(candidate)
+            # reuse prebuilt candidate document and cached candidate embedding
+            document = candidate_documents[candidate_id]
+            candidate_skills = self.candidate_ranker.skill_service.extract_skills(document)
 
             candidate_embedding = self.semantic_service.get_candidate_embedding_by_index(
                 embedding_index
             )
 
-            result = self.candidate_ranker.rank_candidate(
+            result = candidate_ranker.rank_candidate(
                 candidate,
                 document,
                 candidate_embedding,
                 job,
                 job_embedding,
                 job_skills=job_skills,
-                semantic_service=self.semantic_service,
+                semantic_service=semantic_service,
                 candidate_index=embedding_index,
+                career_relevance_score=career_relevance_cache.get(candidate_id, 0.0),
+                candidate_skills=candidate_skills,
             )
 
             # ==========================================

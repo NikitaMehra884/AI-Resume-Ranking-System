@@ -104,5 +104,5 @@ class CSVExportService:
                 ])
 
         print(
-            f"\nCSV exported successfully → {output_path}"
+            f"\nCSV exported successfully -> {output_path}"
         )

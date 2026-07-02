@@ -1,6 +1,6 @@
-import time
+import importlib
 import sys
-from pathlib import Path
+import time
 
 
 TOP_K = 100
@@ -8,37 +8,27 @@ BATCH_SIZE = 512
 
 
 def check_dependencies():
+    required_modules = [
+        ("numpy", "numpy"),
+        ("faiss", "faiss-cpu (or faiss)"),
+        ("sentence_transformers", "sentence-transformers"),
+        ("sklearn", "scikit-learn"),
+        ("rank_bm25", "rank_bm25"),
+    ]
+
     missing = []
 
-    try:
-        import numpy  # noqa: F401
-    except Exception:
-        missing.append("numpy")
-
-    try:
-        import faiss  # noqa: F401
-    except Exception:
-        missing.append("faiss-cpu (or faiss)")
-
-    try:
-        import sentence_transformers  # noqa: F401
-    except Exception:
-        missing.append("sentence-transformers")
-
-    try:
-        import sklearn  # noqa: F401
-    except Exception:
-        missing.append("scikit-learn")
-
-    try:
-        import rank_bm25  # noqa: F401
-    except Exception:
-        missing.append("rank_bm25")
+    for module_name, display_name in required_modules:
+        try:
+            importlib.import_module(module_name)
+        except (ImportError, ModuleNotFoundError):
+            missing.append(display_name)
 
     if missing:
         print("Missing Python packages:", ", ".join(missing))
         print("Please install dependencies:")
         print("    pip install -r requirements.txt")
+        print(f"Interpreter: {sys.executable}")
         sys.exit(1)
 
 

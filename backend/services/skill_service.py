@@ -95,6 +95,19 @@ class SkillService:
             "llms": "llm"
         }
 
+        self.multi_word_skills = sorted(
+            [skill for skill in self.skills if " " in skill],
+            key=len,
+            reverse=True,
+        )
+        self.single_word_skills = sorted(
+            [skill for skill in self.skills if " " not in skill]
+        )
+        self._multi_word_patterns = {
+            skill: re.compile(rf"\b{re.escape(skill)}\b")
+            for skill in self.multi_word_skills
+        }
+
     # ==========================================
     # Normalize
     # ==========================================
