@@ -1,15 +1,40 @@
+# Python
 venv/
 __pycache__/
+*.py[cod]
+*$py.class
+*.prof
+*.zip
 
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment
+.env
+.env.local
+
+# Cache & Models
 cache/
-
-backend/outputs/
-
-data/dataset/candidates.jsonl
-
 *.npy
 *.pkl
 *.index
-*.zip
 
+# Node / React
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Output
 output.txt
+backend/outputs/
+backend/output/
+
+# Dataset large files
+data/dataset/candidates.jsonl
+
+# Testing & IDE
+.pytest_cache/
+.vscode/
+.idea/
