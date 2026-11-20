@@ -1,3 +1,4 @@
+import uuid
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session
@@ -123,7 +124,9 @@ async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_
     # Replace skills
     db.query(CandidateSkill).filter(CandidateSkill.candidate_id == profile.candidate_id).delete()
     for s in parsed["skills"]:
-        db.add(CandidateSkill(candidate_id=profile.candidate_id, name=s["name"], proficiency=s["proficiency"]))
+        s_name = s["name"] if isinstance(s, dict) else str(s)
+        s_prof = s.get("proficiency", "advanced") if isinstance(s, dict) else "advanced"
+        db.add(CandidateSkill(candidate_id=profile.candidate_id, name=s_name, proficiency=s_prof))
 
     db.commit()
     db.refresh(profile)

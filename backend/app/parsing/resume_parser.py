@@ -100,6 +100,7 @@ class ResumeParser:
                 degree = d
                 break
 
+        skill_details = [{"name": s, "proficiency": "advanced"} for s in skills]
         return {
             "full_name": name,
             "email": email,
@@ -112,8 +113,9 @@ class ResumeParser:
             "years_of_experience": yoe,
             "current_title": current_title,
             "current_company": "Tech Corp",
-            "skills": skills,
-            "skill_details": [{"name": s, "proficiency": "advanced"} for s in skills],
+            "skills": skill_details,
+            "skill_names": skills,
+            "skill_details": skill_details,
             "education": [{"institution": "University", "degree": degree, "field_of_study": "Computer Science"}],
             "career_history": [{"company": "Tech Corp", "title": current_title, "duration_months": int(yoe * 12), "description": text[:300]}],
             "raw_text": text
