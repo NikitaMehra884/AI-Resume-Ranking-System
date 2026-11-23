@@ -26,7 +26,7 @@ export const LandingPage: React.FC = () => {
             </div>
             <div>
               <span className="text-lg font-bold bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">
-                TalentIntelligence
+                HUMEXA
               </span>
               <span className="hidden sm:inline-block ml-2 text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
                 v2.0

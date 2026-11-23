@@ -65,6 +65,15 @@ def create_job(data: JobCreate, db: Session = Depends(get_db), current_user: Use
     db.refresh(job)
     return job
 
+@router.delete("/{job_id}")
+def delete_job(job_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_recruiter)):
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    db.delete(job)
+    db.commit()
+    return {"message": "Job deleted successfully", "job_id": job_id}
+
 @router.put("/{job_id}", response_model=JobOut)
 def update_job(job_id: int, data: JobUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_recruiter)):
     job = db.query(Job).filter(Job.id == job_id).first()
@@ -87,6 +96,15 @@ def update_job(job_id: int, data: JobUpdate, db: Session = Depends(get_db), curr
     db.commit()
     db.refresh(job)
     return job
+
+@router.delete("/{job_id}")
+def delete_job(job_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_recruiter)):
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    db.delete(job)
+    db.commit()
+    return {"message": "Job deleted successfully", "job_id": job_id}
 
 @router.post("/analyze-jd", response_model=JDAnalysisResponse)
 @router.post("/extract-skills", response_model=JDAnalysisResponse)
