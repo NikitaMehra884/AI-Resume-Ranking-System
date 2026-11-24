@@ -1,7 +1,35 @@
 import pickle
 import threading
 from typing import List, Dict, Any, Optional
-import faiss
+# Attempt to import faiss; if unavailable, use a lightweight fallback implementation
+try:
+    import faiss
+except ImportError:  # pragma: no cover
+    # Simple fallback: use NumPy for inner product similarity
+    class _FlatIPIndex:
+        def __init__(self, dim: int):
+            self.dim = dim
+            self.embeddings = []  # List of np.ndarray vectors
+            self.ntotal = 0
+
+        def add(self, vecs: "np.ndarray") -> None:
+            # Expect vecs shape (n, dim)
+            self.embeddings.append(vecs.astype("float32"))
+            self.ntotal += vecs.shape[0]
+
+        def search(self, queries: "np.ndarray", k: int):
+            # Compute inner product similarity between each query and all stored vectors
+            if self.ntotal == 0:
+                return (np.zeros((queries.shape[0], k)), np.full((queries.shape[0], k), -1, dtype=int))
+            all_embs = np.vstack(self.embeddings)
+            scores = queries @ all_embs.T
+            idx = np.argsort(-scores, axis=1)[:, :k]
+            top_scores = np.take_along_axis(scores, idx, axis=1)
+            return (top_scores, idx)
+
+    # Provide a minimal namespace with IndexFlatIP compatible API
+    class faiss:  # pragma: no cover
+        IndexFlatIP = _FlatIPIndex
 import numpy as np
 from backend.app.core.config import settings
 

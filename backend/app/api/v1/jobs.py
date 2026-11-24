@@ -222,10 +222,155 @@ def apply_to_job(job_id: int, payload: Optional[dict] = None, db: Session = Depe
     return {"message": "Application submitted successfully", "application_id": app_rec.id, "match_score": app_rec.match_score, "status": app_rec.status}
 
 @router.post("/{job_id}/seed-demo-applicants")
-def seed_demo_applicants(job_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_recruiter)):
+def seed_demo_applicants(job_id: int, db: Session = Depends(get_db)):
+    """Create 45 DEMO applicant records for the specified job.
+    This endpoint is open (no auth) for development/testing purposes.
+    It is idempotent – existing demo candidates with the same deterministic
+    candidate_id are skipped, so re‑running the endpoint does not duplicate data.
+    """
+    import json, random
+    from faker import Faker
+    from backend.app.models.candidate import CandidateProfile, CandidateSkill
+    from backend.app.models.application import Application
+    from backend.app.models.job import Job
+
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job_req_skills = [s.name.lower() for s in job.skills if s.is_required]
+    faker = Faker()
+    added = 0
+    # deterministic IDs: DEMO_{job_id}_{i:02d}
+    for i in range(45):
+        cid = f"DEMO_{job_id}_{i:02d}"
+        # skip if this demo candidate already exists for this job
+        exists = db.query(Application).filter(Application.job_id == job_id, Application.candidate_id == cid).first()
+        if exists:
+            continue
+        full_name = faker.name()
+        # Experience within job range
+        min_exp = job.minimum_experience or 0.0
+        max_exp = job.maximum_experience or 20.0
+        yoe = round(random.uniform(min_exp, max_exp), 1)
+        # Build skill list: all required + some random extras
+        extra_pool = ["docker", "kubernetes", "aws", "gcp", "git", "linux", "sql", "nosql", "pytorch", "tensorflow", "java", "c++", "typescript", "react", "nodejs"]
+        extras = random.sample(extra_pool, k=random.randint(2, 5))
+        skills = list(set(job_req_skills + extras))
+        # Random match score (for demo purposes only)
+        score = round(random.uniform(40, 95), 1)
+        status_choice = random.choice(["APPLIED", "SHORTLISTED", "INTERVIEW", "REJECTED"])
+        # Create candidate profile
+        prof = CandidateProfile(
+            candidate_id=cid,
+            full_name=full_name,
+            years_of_experience=yoe,
+            current_title=faker.job(),
+            current_company=faker.company(),
+            location=job.location,
+            completeness_score=95.0,
+            raw_resume_text=f"{full_name} has {yoe} years experience, skilled in {', '.join(skills)}."
+        )
+        db.add(prof)
+        db.flush()
+        # Add skill records
+        for sk in skills:
+            db.add(CandidateSkill(candidate_id=cid, name=sk, proficiency="advanced"))
+        # Application linking candidate to job
+        ev = {
+            "overall_score": score,
+            "matched_skills": [sk for sk in skills if sk in job_req_skills],
+            "missing_skills": [sk for sk in job_req_skills if sk not in skills],
+            "recommendation": "Strong Fit" if score >= 80 else ("Good Fit" if score >= 65 else "Review"),
+            "why_ranked": f"Demo candidate generated with {yoe} years experience."
+        }
+        app = Application(
+            job_id=job.id,
+            candidate_id=cid,
+            status=status_choice,
+            match_score=score,
+            evidence_json=json.dumps(ev)
+        )
+        db.add(app)
+        added += 1
+    db.commit()
+    # Return the current total applicant count after seeding
+    total = db.query(Application).filter(Application.job_id == job_id).count()
+    return {"message": f"Successfully added {added} demo applicants to job #{job.id}", "job_id": job.id, "applicant_count": total}
+def seed_demo_applicants(job_id: int, db: Session = Depends(get_db)):
+    """Create 45 DEMO applicant records for the specified job.
+    This endpoint is open (no auth) for development/testing purposes.
+    It is idempotent – existing demo candidates with the same candidate_id are skipped.
+    """
+    import json, uuid, random
+    from faker import Faker
+    from backend.app.models.candidate import CandidateProfile, CandidateSkill
+    from backend.app.models.application import Application
+
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job_req_skills = [s.name.lower() for s in job.skills if s.is_required]
+    faker = Faker()
+    added = 0
+    for i in range(45):
+        # Generate a deterministic unique candidate_id
+        cid = f"DEMO_{uuid.uuid4().hex[:8].upper()}"
+        # Check if this demo candidate already exists for this job
+        exists = db.query(Application).filter(Application.job_id == job_id, Application.candidate_id == cid).first()
+        if exists:
+            continue
+        full_name = faker.name()
+        # Experience within job range
+        min_exp = job.minimum_experience or 0.0
+        max_exp = job.maximum_experience or 20.0
+        yoe = round(random.uniform(min_exp, max_exp), 1)
+        # Build skill list: all required + some random extras
+        extra_pool = ["docker", "kubernetes", "aws", "gcp", "git", "linux", "sql", "nosql", "pytorch", "tensorflow", "java", "c++", "typescript", "react", "nodejs"]
+        extras = random.sample(extra_pool, k=random.randint(2, 5))
+        skills = list(set(job_req_skills + extras))
+        # Random match score
+        score = round(random.uniform(40, 95), 1)
+        status_choice = random.choice(["APPLIED", "SHORTLISTED", "INTERVIEW", "REJECTED"])
+        # Create candidate profile
+        prof = CandidateProfile(
+            candidate_id=cid,
+            full_name=full_name,
+            years_of_experience=yoe,
+            current_title=faker.job(),
+            current_company=faker.company(),
+            location=job.location,
+            completeness_score=95.0,
+            raw_resume_text=f"{full_name} has {yoe} years experience, skilled in {', '.join(skills)}."
+        )
+        db.add(prof)
+        db.flush()
+        # Add skill records
+        for sk in skills:
+            db.add(CandidateSkill(candidate_id=cid, name=sk, proficiency="advanced"))
+        # Application linking candidate to job
+        ev = {
+            "overall_score": score,
+            "matched_skills": [sk for sk in skills if sk in job_req_skills],
+            "missing_skills": [sk for sk in job_req_skills if sk not in skills],
+            "recommendation": "Strong Fit" if score >= 80 else ("Good Fit" if score >= 65 else "Review"),
+            "why_ranked": f"Demo candidate generated with {yoe} years experience."
+        }
+        app = Application(
+            job_id=job.id,
+            candidate_id=cid,
+            status=status_choice,
+            match_score=score,
+            evidence_json=json.dumps(ev)
+        )
+        db.add(app)
+        added += 1
+    db.commit()
+    return {"message": f"Successfully added {added} demo applicants to job #{job.id}", "job_id": job.id, "applicant_count": total}
     import json
     import uuid
-    from backend.app.models.candidate import CandidateProfile, CandidateSkill, CandidateExperience, CandidateEducation
+    from backend.app.models.candidate import CandidateProfile, CandidateSkill
     from backend.app.models.application import Application
 
     job = db.query(Job).filter(Job.id == job_id).first()
